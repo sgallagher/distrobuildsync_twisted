@@ -1,0 +1,4 @@
+fedora_messaging
+GitPython
+twisted
+pyyaml
