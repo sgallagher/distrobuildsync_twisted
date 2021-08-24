@@ -1,5 +1,6 @@
 import argparse
 import fedora_messaging.api
+import fedora_messaging.config
 import logging
 import sys
 
@@ -89,7 +90,7 @@ def main():
     loglevel = getattr(logging, args.loglevel.upper())
     logger.setLevel(loglevel)
 
-    config.config_timer = args.update  # * 60
+    config.config_timer = args.update * 60
     config.retries = args.retry
     config.dry_run = args.dry_run
     config.distrogitsync = args.distrogitsync
@@ -107,6 +108,10 @@ def main():
     # Schedule configuration updates
     updater = task.LoopingCall(config.update_config)
     updater.start(config.config_timer, now=False)
+
+    # Schedule batch checking
+    config.batch_processor = task.LoopingCall(listener.process_batch)
+    config.batch_processor.start(config.batch_timer, now=False)
 
     # Start listening for Fedora Messages
     fedora_messaging.api.twisted_consume(listener.process_message)

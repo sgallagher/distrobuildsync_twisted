@@ -5,13 +5,16 @@ import tempfile
 import twisted.internet.utils
 import yaml
 
-from twisted.internet.defer import Deferred, inlineCallbacks
+from collections import defaultdict
+from queue import SimpleQueue
+
+from twisted.internet.defer import inlineCallbacks
 
 # Global logger
 logger = logging.getLogger(__name__)
 
 # Configuration options
-batch_timer = None
+batch_timer = 2
 config_timer = 300
 configuration = None
 config_ref = None
@@ -21,6 +24,13 @@ retries = 3
 scmurl = None
 main = None
 comps = None
+# If we haven't gotten the message within 10 minutes, assume we missed it
+waitrepo_timeout = 600
+
+# Process state
+batch_processor = None
+message_queue = SimpleQueue()
+awaited_repos = defaultdict(list)
 
 
 class ConfigError(Exception):
@@ -101,6 +111,8 @@ def get_config_ref(url):
 
 @inlineCallbacks
 def update_config():
+    global main
+    global comps
     logger.critical(f"Updating configuration")
 
     try:
@@ -126,6 +138,8 @@ def load_config():
 
     :returns: The configuration dictionary, or None on error
     """
+    global main
+    global comps
     cdir = tempfile.TemporaryDirectory(prefix="distrobaker-")
     logger.info("Fetching configuration from %s to %s", scmurl, cdir.name)
     scm = split_scmurl(scmurl)
