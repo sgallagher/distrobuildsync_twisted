@@ -41,7 +41,7 @@ class UnknownRefError(ConfigError):
     pass
 
 
-def split_scmurl(scmurl):
+def split_scmurl(url):
     """Splits a `link#ref` style URLs into the link and ref parts.  While
     generic, many code paths in DistroBuildSync expect these to be branch names.
     `link` forms are also accepted, in which case the returned `ref` is None.
@@ -50,10 +50,10 @@ def split_scmurl(scmurl):
     These can only be detected if the link matches the standard dist-git
     pattern; in other cases the results may be bogus or None.
 
-    :param scmurl: A link#ref style URL, with #ref being optional
+    :param url: A link#ref style URL, with #ref being optional
     :returns: A dictionary with `link`, `ref`, `ns` and `comp` keys
     """
-    scm = scmurl.split("#", 1)
+    scm = url.split("#", 1)
     nscomp = scm[0].split("/")
     return {
         "link": scm[0],
@@ -86,7 +86,7 @@ def get_config_ref(url):
     config SCMURL.  Used by the update function to check whether the
     config should be resync'd.
 
-    :param scmurl: Config SCMURL
+    :param url: Config SCMURL
     :returns: Remote ref or None on error
     """
     scm = split_scmurl(url)
@@ -113,6 +113,7 @@ def get_config_ref(url):
 def update_config():
     global main
     global comps
+    global scmurl
     logger.critical(f"Updating configuration")
 
     try:
@@ -140,6 +141,7 @@ def load_config():
     """
     global main
     global comps
+    global scmurl
     cdir = tempfile.TemporaryDirectory(prefix="distrobaker-")
     logger.info("Fetching configuration from %s to %s", scmurl, cdir.name)
     scm = split_scmurl(scmurl)
