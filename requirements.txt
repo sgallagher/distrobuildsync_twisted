@@ -1,5 +1,6 @@
 fedora_messaging
 GitPython
-twisted
-pyyaml
 koji
+pyyaml
+requests
+twisted

@@ -1,6 +1,7 @@
 import git
 import logging
 import os
+import requests
 import tempfile
 import twisted.internet.utils
 import yaml
@@ -123,12 +124,49 @@ def update_config():
         logger.critical(e)
         raise ConfigError(f"The configuration repository is unavailable, skipping update.  Checking again in {config_timer} seconds.")
 
-    if ref == config_ref:
+    # If we're using the automatic package list (such as with Fedora ELN), we cannot
+    # assume that it remains unchanged, so we need to reload it each interval.
+    if ref == config_ref and not main["control"]["autopackagelist"]:
         logger.debug(f"Configuration not changed, skipping update.  Checking again in {config_timer} seconds.")
         return
 
     main, comps = yield load_config()
     config_ref = ref
+
+
+def get_distro_packages(
+        distro_url = "https://tiny.distro.builders",
+        distro_view="eln",
+        arches=None,
+        which_source=None
+    ):
+    """
+    Fetches the list of desired sources from Content Resolver
+    for each of the given 'arches'.
+    """
+    if not arches:
+        arches = ["aarch64", "armv7hl", "ppc64le", "s390x", "x86_64"]
+    if not which_source:
+        which_source = ["source", "buildroot-source"]
+
+    merged_packages = set()
+
+    for arch in arches:
+        for this_source in which_source:
+            url = (
+                "{distro_url}"
+                "/view-{this_source}-package-name-list--view-{distro_view}--{arch}.txt"
+            ).format(distro_url=distro_url, this_source=this_source, distro_view=distro_view, arch=arch)
+
+            logger.debug("downloading {url}".format(url=url))
+
+            r = requests.get(url, allow_redirects=True)
+            for line in r.text.splitlines():
+                merged_packages.add(line)
+
+    logger.debug("Found a total of {} packages".format(len(merged_packages)))
+
+    return { "rpms": dict.fromkeys(merged_packages) }
 
 
 # FIXME: This needs even more error checking, e.g.
@@ -273,6 +311,11 @@ def load_config():
                 else:
                     logger.error("Configuration error: control.%s missing.", k)
                     return None
+
+            n["control"]["autopackagelist"] = None
+            if "autopackagelist" in cnf["control"]:
+                n["control"]["autopackagelist"] = cnf["control"]["autopackagelist"]
+
             n["control"]["exclude"] = {"rpms": set(), "modules": set()}
             if "exclude" in cnf["control"]:
                 for cns in ("rpms", "modules"):
@@ -329,6 +372,11 @@ def load_config():
     }
     if "components" in y:
         cnf = y["components"]
+    if "components" in y or "autopackagelist" in n["control"]:
+        if "components" in y:
+            cnf = y["components"]
+        else:
+            cnf = get_distro_packages(distro_view=n["control"]["autopackagelist"])
         for k in ("rpms", "modules"):
             if k in cnf:
                 for p in cnf[k].keys():
