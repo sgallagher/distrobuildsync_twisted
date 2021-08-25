@@ -114,6 +114,7 @@ def update_config():
     global main
     global comps
     global scmurl
+    global config_ref
     logger.critical(f"Updating configuration")
 
     try:
@@ -122,7 +123,12 @@ def update_config():
         logger.critical(e)
         raise ConfigError(f"The configuration repository is unavailable, skipping update.  Checking again in {config_timer} seconds.")
 
+    if ref == config_ref:
+        logger.debug(f"Configuration not changed, skipping update.  Checking again in {config_timer} seconds.")
+        return
+
     main, comps = yield load_config()
+    config_ref = ref
 
 
 # FIXME: This needs even more error checking, e.g.
