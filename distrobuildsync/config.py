@@ -24,8 +24,8 @@ retries = 3
 scmurl = None
 main = None
 comps = None
-# If we haven't gotten the message within 10 minutes, assume we missed it
-waitrepo_timeout = 600
+# If we haven't gotten the message within 15 minutes, assume we missed it
+waitrepo_timeout = 15 * 60
 
 # Process state
 batch_processor = None
