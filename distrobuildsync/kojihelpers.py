@@ -149,21 +149,6 @@ def get_ref_overrides(modulemd):
     return ref_overrides
 
 
-def split_module(comp):
-    """Splits modules component name into name and stream pair.  Expects the
-    name to be in the `name:stream` format.  Defaults to stream=master if the
-    split fails.
-
-    :param comp: The component name
-    :returns: Dictionary with name and stream
-    """
-    ms = comp.split(":")
-    return {
-        "name": ms[0],
-        "stream": ms[1] if len(ms) > 1 and ms[1] else "master",
-    }
-
-
 def get_build(comp, ns="rpms"):
     """Get the latest build NVR for the specified component.  Searches the
     component namespace trigger tag to locate this.  Note this is not the
@@ -210,7 +195,7 @@ def get_build(comp, ns="rpms"):
         return None
 
     if ns == "modules":
-        ms = split_module(comp)
+        ms = config.split_module(comp)
         cname = ms["name"]
         sname = ms["stream"]
         try:
