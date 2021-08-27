@@ -22,7 +22,7 @@ configuration = None
 config_ref = None
 distrogitsync = None
 dry_run = False
-retries = 3
+retry = 3
 scmurl = None
 main = None
 comps = None
@@ -41,6 +41,38 @@ class ConfigError(Exception):
 
 class UnknownRefError(ConfigError):
     pass
+
+
+def loglevel(val=None):
+    """Gets or, optionally, sets the logging level of the module.
+    Standard numeric levels are accepted.
+
+    :param val: The logging level to use, optional
+    :returns: The current logging level
+    """
+    if val is not None:
+        try:
+            logger.setLevel(val)
+        except ValueError:
+            logger.warning(
+                "Invalid log level passed to DistroBuildSync logger: %s", val
+            )
+        except Exception:
+            logger.exception("Unable to set log level: %s", val)
+    return logger.getEffectiveLevel()
+
+
+def retries(val=None):
+    """Gets or, optionally, sets the number of retries for various
+    operational failures.  Typically used for handling dist-git requests.
+
+    :param val: The number of retries to attept, optional
+    :returns: The current value of retries
+    """
+    global retry
+    if val is not None:
+        retry = val
+    return retry
 
 
 def split_scmurl(url):
@@ -184,8 +216,6 @@ def load_config():
     The operation is atomic and the function can be safely called to update
     the configuration without the danger of clobbering the current one.
 
-    `crepo` must be a git repository with `distrobaker.yaml` in it.
-
     :returns: The configuration dictionary, or None on error
     """
     global main
@@ -196,7 +226,7 @@ def load_config():
     scm = split_scmurl(scmurl)
     if scm["ref"] is None:
         scm["ref"] = "master"
-    for attempt in range(retries):
+    for attempt in range(retry):
         try:
             git.Repo.clone_from(scm["link"], cdir.name).git.checkout(
                 scm["ref"]
