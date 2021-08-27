@@ -333,3 +333,47 @@ def call_distrogitsync(ns, comp, ref_overrides=None):
             except requests.exceptions.RequestException:
                 logger.exception("Failed to contact distrogitsync")
                 continue
+
+
+def create_side_tag(downstream_target, upstream_sidetag):
+    """
+    Creates new downstream sidetag based inheriting the build tag of
+    `downstream_target` and adds `downstream_sidetag` "extra" record
+    to `upstream_sidetag` in upstream Koji so it is possible to map
+    upstream sidetag to downstream sidetag.
+
+    If the `downstream_sidetag` already exists, it returns it.
+
+    :params str downstream_target: Downstream target name.
+    :params str upstream_sidetag: Upstream sidetag name.
+    :return str: Name of the downstream sidetag.
+    """
+
+    # Create downstream sidetag only if it does not exist.
+    upstream_koji = get_buildsys("source", force_login=True)
+    upstream_tag = upstream_koji.getTag(upstream_sidetag)
+    if "downstream_sidetag" in upstream_tag["extra"]:
+        downstream_sidetag = upstream_tag["extra"]["downstream_sidetag"]
+        logger.info("Downstream sidetag for %s already exists: %s." % (upstream_sidetag, downstream_sidetag))
+        return downstream_sidetag
+
+    logger.info("Creating downstream sidetag for %s." % upstream_sidetag)
+    # Get downstream build tag.
+    downstream_koji = get_buildsys("destination")
+    downstream_target = downstream_koji.getBuildTarget(downstream_target)
+    downstream_tag = downstream_target["build_tag_name"]
+
+    # Create downstream sidetag
+    if not config.dry_run:
+        downstream_sidetag = downstream_koji.createSideTag(downstream_tag, suffix="stack-gate")["name"]
+    else:
+        logger.info("Running in dry_run mode, not creating downstream_sidetag for %s." % downstream_tag)
+        downstream_sidetag = "%s-dry-run-mode-stack-gate" % downstream_tag
+
+    # Set the mapping between upstream sidetag and downstream sidetag.
+    if not config.dry_run:
+        upstream_koji.editTag2(upstream_sidetag, extra={"downstream_sidetag": downstream_sidetag})
+        logger.info("Downstream sidetag for %s created: %s." % (upstream_sidetag, downstream_sidetag))
+    else:
+        logger.info("Running in dry_run mode, not editing upstream_sidetag %s ." % upstream_sidetag)
+    return downstream_sidetag

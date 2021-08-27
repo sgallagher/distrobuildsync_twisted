@@ -75,8 +75,8 @@ def process_message(msg):
 
     elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
        or tag.startswith("%s-side" % upstream_build_tag)):
-        # TODO: Create side tag if needed
-        return
+        # Ensure that the downstream side-tag exists
+        target_override = kojihelpers.create_side_tag(config.main["build"]["target"], tag)
 
     scmurl = kojihelpers.get_scmurl(msg.body["build_id"])
 
