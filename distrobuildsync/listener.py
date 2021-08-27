@@ -144,4 +144,5 @@ def build_components(target, builds):
             logger.info(f"{dry}{scratch}uilding {downstream_scmurl} for {target}")
 
             if not config.dry_run:
+                kojihelpers.call_distrogitsync(namespace, component, rd.ref_overrides)
                 bsys.build(downstream_scmurl, target, {"scratch": config.main["build"]["scratch"]})

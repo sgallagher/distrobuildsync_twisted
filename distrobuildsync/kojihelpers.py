@@ -2,6 +2,7 @@ from . import config
 
 import datetime
 import koji
+import requests
 import yaml
 
 from twisted.internet import reactor, task
@@ -203,3 +204,19 @@ def wait_repo(tag):
 
     logger.info(f"Waiting for {tag} to regenerate")
     return deferred
+
+
+def call_distrogitsync(ns, comp, ref_overrides=None):
+    compset = [(ns, comp)]
+    ref_overrides = ref_overrides or {}
+    for c in ref_overrides.keys():
+        compset.append(("rpms", c))
+    for namespace, c in compset:
+        if config.distrogitsync:
+            logger.info("Calling distrogitsync for %s/%s" % (namespace, c))
+            try:
+                r = requests.post("%s/%s/%s" % (config.distrogitsync, namespace, c))
+                r.raise_for_status()
+            except requests.exceptions.RequestException:
+                logger.exception("Failed to contact distrogitsync")
+                continue
