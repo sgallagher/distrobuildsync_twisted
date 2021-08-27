@@ -149,6 +149,119 @@ def get_ref_overrides(modulemd):
     return ref_overrides
 
 
+def split_module(comp):
+    """Splits modules component name into name and stream pair.  Expects the
+    name to be in the `name:stream` format.  Defaults to stream=master if the
+    split fails.
+
+    :param comp: The component name
+    :returns: Dictionary with name and stream
+    """
+    ms = comp.split(":")
+    return {
+        "name": ms[0],
+        "stream": ms[1] if len(ms) > 1 and ms[1] else "master",
+    }
+
+
+def get_build(comp, ns="rpms"):
+    """Get the latest build NVR for the specified component.  Searches the
+    component namespace trigger tag to locate this.  Note this is not the
+    highest NVR, it's the latest tagged build.
+
+    :param comp: The component name
+    :param ns: The component namespace
+    :returns: NVR of the latest build, or None on error
+    """
+    if not config.main:
+        logger.critical("DistroBuildSync is not configured, aborting.")
+        return None
+
+    bsys = get_buildsys("source")
+    if bsys is None:
+        logger.error(
+            "Build system unavailable, cannot find the latest build for %s/%s.",
+            ns,
+            comp,
+        )
+        return None
+
+    if ns == "rpms":
+        try:
+            nvr = bsys.listTagged(
+                config.main["trigger"][ns], package=comp, latest=True
+            )
+        except Exception:
+            logger.exception(
+                "An error occured while getting the latest build for %s/%s.",
+                ns,
+                comp,
+            )
+            return None
+        if nvr:
+            logger.debug(
+                "Located the latest build for %s/%s: %s",
+                ns,
+                comp,
+                nvr[0]["nvr"],
+            )
+            return nvr[0]["nvr"]
+        logger.error("Did not find any builds for %s/%s.", ns, comp)
+        return None
+
+    if ns == "modules":
+        ms = split_module(comp)
+        cname = ms["name"]
+        sname = ms["stream"]
+        try:
+            builds = bsys.listTagged(
+                config.main["trigger"][ns],
+            )
+        except Exception:
+            logger.exception(
+                "An error occured while getting the latest builds for %s/%s.",
+                ns,
+                cname,
+            )
+            return None
+        if not builds:
+            logger.error("Did not find any builds for %s/%s.", ns, cname)
+            return None
+        logger.debug(
+            "Found %d total builds for %s/%s",
+            len(builds),
+             ns,
+            cname,
+         )
+        # find the latest build for name:stream
+        latest = None
+        latest_version = 0
+        for b in builds:
+            binfo = get_build_info(b["nvr"])
+            if (
+                binfo is None
+                or binfo["name"] is None
+                or binfo["stream"] is None
+            ):
+                logger.error(
+                    "Could not get module info for %s, skipping.",
+                    b["nvr"],
+                )
+            elif cname == binfo["name"] and sname == binfo["stream"] and int(binfo["module_version"]) >= latest_version:
+                latest = b["nvr"]
+                latest_version = int(binfo["module_version"])
+        if latest:
+            logger.debug(
+                "Located the latest build for %s/%s: %s", ns, comp, latest
+            )
+            return latest
+        logger.error("Did not find any builds for %s/%s.", ns, comp)
+        return None
+
+    logger.error("Unrecognized namespace: %s/%s", ns, comp)
+    return None
+
+
 def get_target_info(target):
     """Get information about a build target
 

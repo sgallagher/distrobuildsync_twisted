@@ -2,15 +2,22 @@ import argparse
 import fedora_messaging.api
 import fedora_messaging.config
 import logging
+import re
 import sys
 
 from . import config
 from . import listener
+from . import kojihelpers
 
 from twisted.internet import reactor, task
 
 
 logger = config.logger
+
+# Matching the namespace/component text format
+cre = re.compile(
+    r"^(?P<namespace>rpms|modules)/(?P<component>[A-Za-z0-9:._+-]+)$"
+)
 
 
 def parse_args():
@@ -80,8 +87,82 @@ def parse_args():
     return args
 
 
-def oneshot(packages):
-    raise NotImplementedError("Oneshot mode not yet implemented")
+def oneshot(compset):
+    """Processes the supplied set of components.  If the set is empty,
+    fetch all latest components from the trigger tags.
+
+    :param compset: A set of components to process in the `ns/comp` form
+    :returns: None
+    """
+    if not config.main:
+        logger.critical("DistroBuildSync is not configured, aborting.")
+        return None
+
+    if not compset:
+        logger.debug(
+            "No components selected, gathering components from triggers."
+        )
+        compset.update(
+            "{}/{}".format("rpms", x["package_name"])
+            for x in kojihelpers.get_buildsys("source").listTagged(
+                config.main["trigger"]["rpms"], latest=True
+            )
+        )
+
+    logger.info("Processing %d component(s).", len(compset))
+    rd_list = []
+    for rec in sorted(compset, key=str.lower):
+        m = cre.match(rec)
+        if m is None:
+            logger.error("Cannot process %s; looks like garbage.", rec)
+            continue
+        m = m.groupdict()
+        logger.info("Processing %s.", rec)
+
+        if m["component"] in config.main["control"]["exclude"][m["namespace"]]:
+            logger.info(
+                "The %s/%s component is excluded from sync, skipping.",
+                m["namespace"],
+                m["component"],
+            )
+            continue
+
+        if (
+            config.main["control"]["strict"]
+            and m["component"] not in config.comps[m["namespace"]]
+        ):
+            logger.info(
+                "The %s/%s component not configured while the strict mode is enabled, ignoring.",
+                m["namespace"],
+                m["component"],
+            )
+            continue
+
+        namespace = m["namespace"]
+        component = m["component"]
+        nvr = kojihelpers.get_build(component, namespace)
+        if not nvr:
+            logger.info("The {namespace}/{component} component's build not tagged in the source Koji tag.")
+            continue
+
+        bi = kojihelpers.get_build_info(nvr)
+        scmurl = bi["scmurl"]
+        ref = config.split_scmurl(scmurl)["ref"]
+        if ref:
+            if namespace == "modules":
+                ref_overrides = kojihelpers.get_ref_overrides(bi["modulemd"])
+            else:
+                ref_overrides = None
+
+        rd_list.append(listener.RebuildData(namespace, component, None, None, scmurl, None, ref_overrides))
+        logger.debug("Scheduled {namespace}/{component} for rebuild")
+
+    # Fire off the builds
+    listener.build_components(None, rd_list)
+
+    rd_list_len = len(rd_list)
+    skipped = len(compset) - rd_list_len
+    logger.info(f"Synchronized {rd_list_len} component(s), {skipped} skipped.")
 
 
 def main():
@@ -102,7 +183,6 @@ def main():
         sys.exit(128)
 
     if args.oneshot:
-        # TODO: Special handling for oneshot mode
         return oneshot(set([i for i in args.select.split(" ") if i]) if args.select else set())
 
     # Schedule configuration updates

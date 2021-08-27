@@ -131,6 +131,8 @@ def rebuild_batch(target, builds):
 def build_components(target, builds):
     bsys = kojihelpers.get_buildsys("destination")
     prefix = config.main["build"]["prefix"]
+    if not target:
+        target = config.main["build"]["target"]
 
     with bsys.multicall(batch=config.koji_batch) as mc:
         for rd in builds:
