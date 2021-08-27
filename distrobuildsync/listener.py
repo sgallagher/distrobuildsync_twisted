@@ -1,12 +1,17 @@
 from . import config
 from . import kojihelpers
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from twisted.internet import reactor, task
 from twisted.internet.defer import AlreadyCalledError, inlineCallbacks
 from queue import Empty
 
 logger = config.logger
+
+
+RebuildData = namedtuple("RebuildData",
+                         ["ns", "comp", "version", "release", "scmurl", "downstream_target", "ref_overrides"],
+                         defaults=[None, None])
 
 
 def process_message(msg):
@@ -31,8 +36,54 @@ def process_message(msg):
         logger.debug("Unable to handle %s topics, ignoring.", msg.topic)
         return
 
+    # Check whether we care about this tag and component
+    comp = msg.body["name"]
+    version = msg.body["version"]
+    release = msg.body["release"]
+    target_override = None
+    ref_overrides = None
+    tag = msg.body["tag"]
+    upstream_build_tag = config.main["trigger"]["rpms"].replace("-gate", "-build")
+
+    # Check that we are watching for this tag
+    if tag == config.main["trigger"]["rpms"]:
+        ns = "rpms"
+    elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
+          or tag.startswith("%s-side" % upstream_build_tag)):
+        ns = "rpms"
+    elif tag == config.main["trigger"]["modules"]:
+        ns = "modules"
+    else:
+        logger.debug(f"Message tag {tag} not configured as a trigger, ignoring.")
+        return
+
+    # Check whether this component is meaningful to us
+    if config.main["control"]["strict"] and comp not in config.comps[ns]:
+        logger.debug(f"{comp} is not an approved component, ignoring")
+        return
+
+    if comp in config.main["control"]["exclude"][ns]:
+        logger.debug(f"{ns}/{comp} is on the exclude list, skipping")
+        return
+
+    # Handle slower tasks after verifying component validity
+    if tag == config.main["trigger"]["modules"]:
+        logger.info("Handling an Module trigger for %s, tag %s.", comp, tag)
+        nvr = f"{comp}-{version}-{release}"
+        bi = kojihelpers.get_build_info(nvr)
+        ref_overrides = kojihelpers.get_ref_overrides(bi["modulemd"])
+
+    elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
+       or tag.startswith("%s-side" % upstream_build_tag)):
+        # TODO: Create side tag if needed
+        return
+
+    scmurl = kojihelpers.get_scmurl(msg.body["build_id"])
+
+    rd = RebuildData(ns, comp, version, release, scmurl, target_override, ref_overrides)
+
     reactor.callFromThread(config.batch_processor.reset)
-    reactor.callFromThread(config.message_queue.put, msg)
+    reactor.callFromThread(config.message_queue.put, rd)
 
 
 def process_batch():
@@ -47,46 +98,9 @@ def process_batch():
         return
 
     # Return to the mainloop so we don't block future batches
-    reactor.callLater(0, split_batch, batch)
-
-
-def split_batch(batch):
-    # The targets may differ
-    # Get the build tags associated with the targets
-    targets = defaultdict(list)
-    for msg in batch:
-        comp = msg.body["name"]
-        nvr = "{}-{}-{}".format(
-            msg.body["name"], msg.body["version"], msg.body["release"]
-        )
-        tag = msg.body["tag"]
-        scmurl = kojihelpers.get_scmurl(msg.body["build_id"])
-
-        upstream_build_tag = config.main["trigger"]["rpms"].replace("-gate", "-build")
-        if tag == config.main["trigger"]["rpms"]:
-            downstream_target = config.main["build"]["target"]
-
-            targets[downstream_target].append({
-                "comp": comp,
-                "nvr": nvr,
-                "scmurl": scmurl,
-                "namespace": "rpms",
-                "ref_overrides": None,
-                "sidetag": None,
-            })
-        elif tag == config.main["trigger"]["modules"]:
-            # TODO
-            pass
-
-        elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
-              or tag.startswith("%s-side" % upstream_build_tag)):
-            # TODO
-            pass
-        else:
-            logger.debug("Message tag not configured as a trigger, ignoring.")
-
-    for target, builds in targets.items():
-        task.deferLater(reactor, 0, rebuild_batch, target, builds)
+    # Schedule a task for each downstream target
+    for b in batch:
+        task.deferLater(reactor, 0, rebuild_batch, b.downstream_target, b)
 
 
 @inlineCallbacks
@@ -95,9 +109,9 @@ def rebuild_batch(target, builds):
 
     # skip tagging and waiting for the repo if source and destination build systems differ
     if not config.dry_run and config.main["source"]["profile"] == config.main["destination"]["profile"]:
-        with bsys.multicall() as mc:
+        with bsys.multicall(batch=config.koji_batch) as mc:
             for build in builds:
-                nvr = build["nvr"]
+                nvr = f"{build.comp}-{build.version}-{build.release}"
                 logger.info(f"Tagging {nvr} into {target}")
                 mc.tagBuild(target, nvr)
 
@@ -118,16 +132,16 @@ def build_components(target, builds):
     bsys = kojihelpers.get_buildsys("destination")
     prefix = config.main["build"]["prefix"]
 
-    with bsys.multicall() as mc:
-        for build in builds:
-            component = build["comp"]
-            namespace = build["namespace"]
-            ref = config.split_scmurl(build["scmurl"])["ref"]
-            scmurl = f"{prefix}/{namespace}/{component}#{ref}"
+    with bsys.multicall(batch=config.koji_batch) as mc:
+        for rd in builds:
+            component = rd.comp
+            namespace = rd.ns
+            ref = config.split_scmurl(rd.scmurl)["ref"]
+            downstream_scmurl = f"{prefix}/{namespace}/{component}#{ref}"
 
             dry = "DRY-RUN: " if config.dry_run else ""
             scratch = "Scratch-b" if config.main["build"]["scratch"] else "B"
-            logger.info(f"{dry}{scratch}uilding {scmurl} for {target}")
+            logger.info(f"{dry}{scratch}uilding {downstream_scmurl} for {target}")
 
             if not config.dry_run:
-                bsys.build(scmurl, target, {"scratch": config.main["build"]["scratch"]})
+                bsys.build(downstream_scmurl, target, {"scratch": config.main["build"]["scratch"]})

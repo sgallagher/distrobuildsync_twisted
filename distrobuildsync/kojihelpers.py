@@ -2,6 +2,7 @@ from . import config
 
 import datetime
 import koji
+import yaml
 
 from twisted.internet import reactor, task
 from twisted.internet.defer import Deferred, inlineCallbacks
@@ -79,6 +80,72 @@ def get_buildsys(which, force_login=False):
             which,
         )
     return vars(get_buildsys)[which]
+
+
+def get_build_info(nvr):
+    """Get SCMURL, plus extra attributes for modules, for a source build system
+    build NVR.  NVRs are unique.
+
+    :param nvr: The build NVR to look up
+    :returns: A dictionary with `scmurl`, `name`, `stream`, and `modulemd` keys,
+    or None on error
+    """
+    if not config.main:
+        logger.critical("DistroBuildSync is not configured, aborting.")
+        return None
+
+    bsys = get_buildsys("source")
+    if bsys is None:
+        logger.error(
+            "Build system unavailable, cannot retrieve the build info of %s.",
+            nvr,
+        )
+        return None
+    try:
+        bsrc = bsys.getBuild(nvr)
+    except Exception:
+        logger.exception(
+            "An error occured while retrieving the build info for %s.", nvr
+        )
+        return None
+
+    bi = dict()
+    if "source" in bsrc:
+        bi["scmurl"] = bsrc["source"]
+        logger.debug("Retrieved SCMURL for %s: %s", nvr, bi["scmurl"])
+    else:
+        logger.error("Cannot find any SCMURL associated with %s.", nvr)
+        return None
+
+    try:
+        minfo = bsrc["extra"]["typeinfo"]["module"]
+        bi["name"] = minfo["name"]
+        bi["stream"] = minfo["stream"]
+        bi["module_version"] = minfo["version"]
+        bi["modulemd"] = minfo["modulemd_str"]
+        logger.debug(
+            "Actual name:stream for %s is %s:%s", nvr, bi["name"], bi["stream"]
+        )
+    except Exception:
+        bi["name"] = None
+        bi["stream"] = None
+        bi["module_version"] = None
+        bi["modulemd"] = None
+        logger.debug("No module info for %s.", nvr)
+
+    return bi
+
+
+def get_ref_overrides(modulemd):
+    """
+    Get RPM components ref overrides from the modulemd file.
+    """
+    ref_overrides = {}
+    data = yaml.safe_load(modulemd)
+    for name, rpm_data in data["data"]["xmd"]["mbs"]["rpms"].items():
+        ref_overrides[name] = rpm_data["ref"]
+    logger.info(f"RPM ref overrides {ref_overrides}")
+    return ref_overrides
 
 
 def get_target_info(target):

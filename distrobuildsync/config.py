@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Configuration options
 batch_timer = 2
 config_timer = 300
+koji_batch = 500
 configuration = None
 config_ref = None
 distrogitsync = None
