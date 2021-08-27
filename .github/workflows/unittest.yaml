@@ -1,0 +1,23 @@
+name: Unit Tests
+on:
+  - push
+  - pull_request
+
+jobs:
+  unittests:
+    name: Python unittests
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install test requirements
+        run: |
+          yum -y --refresh install git-core python3-pip python3-gssapi python3-twisted
+          pip install -r requirements.txt -r test-requirements.txt
+
+      - name: Run unittests
+        run: |
+           PYTHONPATH="$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/tests" trial tests/test_*.py
