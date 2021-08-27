@@ -1,3 +1,5 @@
+import logging
+
 from . import config
 from . import kojihelpers
 
@@ -107,20 +109,21 @@ def process_message(msg):
 
 
 def process_batch():
-    batch = []
+    batches = defaultdict(list)
     while True:
         try:
-            batch.append(config.message_queue.get_nowait())
+            rd = config.message_queue.get_nowait()
+            batches[rd.downstream_target].append(rd)
         except Empty as e:
             break
 
-    if not batch:
+    if not len(batches.keys()):
         return
 
     # Return to the mainloop so we don't block future batches
     # Schedule a task for each downstream target
-    for b in batch:
-        task.deferLater(reactor, 0, rebuild_batch, b.downstream_target, b)
+    for target, builds in batches.items():
+        task.deferLater(reactor, 0, rebuild_batch, target, builds)
 
 
 @inlineCallbacks
@@ -160,6 +163,7 @@ def build_components(target, builds):
 
     with bsys.multicall(batch=config.koji_batch) as mc:
         for rd in builds:
+            logger.critical(f"REMOVEME: {rd}")
             component = rd.comp
             namespace = rd.ns
             ref = config.split_scmurl(rd.scmurl)["ref"]
