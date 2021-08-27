@@ -142,7 +142,9 @@ def oneshot(compset):
         component = m["component"]
         nvr = kojihelpers.get_build(component, namespace)
         if not nvr:
-            logger.info("The {namespace}/{component} component's build not tagged in the source Koji tag.")
+            logger.info(
+                "The {namespace}/{component} component's build not tagged in the source Koji tag."
+            )
             continue
 
         bi = kojihelpers.get_build_info(nvr)
@@ -154,7 +156,11 @@ def oneshot(compset):
             else:
                 ref_overrides = None
 
-        rd_list.append(listener.RebuildData(namespace, component, None, None, scmurl, None, ref_overrides))
+        rd_list.append(
+            listener.RebuildData(
+                namespace, component, None, None, scmurl, None, ref_overrides
+            )
+        )
         logger.debug("Scheduled {namespace}/{component} for rebuild")
 
     # Fire off the builds
@@ -183,7 +189,11 @@ def main():
         sys.exit(128)
 
     if args.oneshot:
-        return oneshot(set([i for i in args.select.split(" ") if i]) if args.select else set())
+        return oneshot(
+            set([i for i in args.select.split(" ") if i])
+            if args.select
+            else set()
+        )
 
     # Schedule configuration updates
     updater = task.LoopingCall(config.update_config)
@@ -195,7 +205,6 @@ def main():
 
     # Start listening for Fedora Messages
     fedora_messaging.api.twisted_consume(listener.process_message)
-
 
     logger.debug("Starting Twisted mainloop")
     reactor.run()

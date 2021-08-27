@@ -94,12 +94,7 @@ def get_config_ref(url):
     scm = split_scmurl(url)
     output = yield twisted.internet.utils.getProcessOutput(
         executable="git",
-        args=(
-            "ls-remote",
-            "--heads",
-            scm["link"],
-            scm["ref"],
-        ),
+        args=("ls-remote", "--heads", scm["link"], scm["ref"]),
         errortoo=True,
     )
 
@@ -123,12 +118,16 @@ def update_config():
         ref = yield get_config_ref(scmurl)
     except UnknownRefError as e:
         logger.critical(e)
-        raise ConfigError(f"The configuration repository is unavailable, skipping update.  Checking again in {config_timer} seconds.")
+        raise ConfigError(
+            f"The configuration repository is unavailable, skipping update.  Checking again in {config_timer} seconds."
+        )
 
     # If we're using the automatic package list (such as with Fedora ELN), we cannot
     # assume that it remains unchanged, so we need to reload it each interval.
     if ref == config_ref and not main["control"]["autopackagelist"]:
-        logger.debug(f"Configuration not changed, skipping update.  Checking again in {config_timer} seconds.")
+        logger.debug(
+            f"Configuration not changed, skipping update.  Checking again in {config_timer} seconds."
+        )
         return
 
     main, comps = yield load_config()
@@ -136,11 +135,11 @@ def update_config():
 
 
 def get_distro_packages(
-        distro_url = "https://tiny.distro.builders",
-        distro_view="eln",
-        arches=None,
-        which_source=None
-    ):
+    distro_url="https://tiny.distro.builders",
+    distro_view="eln",
+    arches=None,
+    which_source=None,
+):
     """
     Fetches the list of desired sources from Content Resolver
     for each of the given 'arches'.
@@ -157,7 +156,12 @@ def get_distro_packages(
             url = (
                 "{distro_url}"
                 "/view-{this_source}-package-name-list--view-{distro_view}--{arch}.txt"
-            ).format(distro_url=distro_url, this_source=this_source, distro_view=distro_view, arch=arch)
+            ).format(
+                distro_url=distro_url,
+                this_source=this_source,
+                distro_view=distro_view,
+                arch=arch,
+            )
 
             logger.debug("downloading {url}".format(url=url))
 
@@ -167,7 +171,7 @@ def get_distro_packages(
 
     logger.debug("Found a total of {} packages".format(len(merged_packages)))
 
-    return { "rpms": dict.fromkeys(merged_packages) }
+    return {"rpms": dict.fromkeys(merged_packages)}
 
 
 # FIXME: This needs even more error checking, e.g.
@@ -315,7 +319,9 @@ def load_config():
 
             n["control"]["autopackagelist"] = None
             if "autopackagelist" in cnf["control"]:
-                n["control"]["autopackagelist"] = cnf["control"]["autopackagelist"]
+                n["control"]["autopackagelist"] = cnf["control"][
+                    "autopackagelist"
+                ]
 
             n["control"]["exclude"] = {"rpms": set(), "modules": set()}
             if "exclude" in cnf["control"]:
@@ -367,17 +373,16 @@ def load_config():
         logger.error("The required configuration block is missing.")
         return None
     components = 0
-    nc = {
-        "rpms": dict(),
-        "modules": dict(),
-    }
+    nc = {"rpms": dict(), "modules": dict()}
     if "components" in y:
         cnf = y["components"]
     if "components" in y or "autopackagelist" in n["control"]:
         if "components" in y:
             cnf = y["components"]
         else:
-            cnf = get_distro_packages(distro_view=n["control"]["autopackagelist"])
+            cnf = get_distro_packages(
+                distro_view=n["control"]["autopackagelist"]
+            )
         for k in ("rpms", "modules"):
             if k in cnf:
                 for p in cnf[k].keys():

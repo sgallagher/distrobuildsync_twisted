@@ -61,7 +61,8 @@ def get_buildsys(which, force_login=False):
                 bsys.gssapi_login()
             except Exception:
                 logger.exception(
-                    "Failed authenticating against the %s koji instance, skipping." % which
+                    "Failed authenticating against the %s koji instance, skipping."
+                    % which
                 )
                 return None
             logger.debug(
@@ -199,9 +200,7 @@ def get_build(comp, ns="rpms"):
         cname = ms["name"]
         sname = ms["stream"]
         try:
-            builds = bsys.listTagged(
-                config.main["trigger"][ns],
-            )
+            builds = bsys.listTagged(config.main["trigger"][ns])
         except Exception:
             logger.exception(
                 "An error occured while getting the latest builds for %s/%s.",
@@ -212,12 +211,7 @@ def get_build(comp, ns="rpms"):
         if not builds:
             logger.error("Did not find any builds for %s/%s.", ns, cname)
             return None
-        logger.debug(
-            "Found %d total builds for %s/%s",
-            len(builds),
-             ns,
-            cname,
-         )
+        logger.debug("Found %d total builds for %s/%s", len(builds), ns, cname)
         # find the latest build for name:stream
         latest = None
         latest_version = 0
@@ -229,10 +223,13 @@ def get_build(comp, ns="rpms"):
                 or binfo["stream"] is None
             ):
                 logger.error(
-                    "Could not get module info for %s, skipping.",
-                    b["nvr"],
+                    "Could not get module info for %s, skipping.", b["nvr"]
                 )
-            elif cname == binfo["name"] and sname == binfo["stream"] and int(binfo["module_version"]) >= latest_version:
+            elif (
+                cname == binfo["name"]
+                and sname == binfo["stream"]
+                and int(binfo["module_version"]) >= latest_version
+            ):
                 latest = b["nvr"]
                 latest_version = int(binfo["module_version"])
         if latest:
@@ -283,13 +280,17 @@ def get_scmurl(build_id):
 
     bsys = get_buildsys("source")
     if bsys is None:
-        logger.error(f"Build system unavailable, cannot retrieve the SCMURL of {build_id}.")
+        logger.error(
+            f"Build system unavailable, cannot retrieve the SCMURL of {build_id}."
+        )
         return None
 
     try:
         buildinfo = bsys.getBuild(build_id, strict=True)
     except koji.GenericError as e:
-        logger.exception(f"Could not retrieve information for build {build_id}")
+        logger.exception(
+            f"Could not retrieve information for build {build_id}"
+        )
         return None
 
     return buildinfo["source"]
@@ -313,7 +314,9 @@ def call_distrogitsync(ns, comp, ref_overrides=None):
         if config.distrogitsync:
             logger.info("Calling distrogitsync for %s/%s" % (namespace, c))
             try:
-                r = requests.post("%s/%s/%s" % (config.distrogitsync, namespace, c))
+                r = requests.post(
+                    "%s/%s/%s" % (config.distrogitsync, namespace, c)
+                )
                 r.raise_for_status()
             except requests.exceptions.RequestException:
                 logger.exception("Failed to contact distrogitsync")
@@ -339,7 +342,10 @@ def create_side_tag(downstream_target, upstream_sidetag):
     upstream_tag = upstream_koji.getTag(upstream_sidetag)
     if "downstream_sidetag" in upstream_tag["extra"]:
         downstream_sidetag = upstream_tag["extra"]["downstream_sidetag"]
-        logger.info("Downstream sidetag for %s already exists: %s." % (upstream_sidetag, downstream_sidetag))
+        logger.info(
+            "Downstream sidetag for %s already exists: %s."
+            % (upstream_sidetag, downstream_sidetag)
+        )
         return downstream_sidetag
 
     logger.info("Creating downstream sidetag for %s." % upstream_sidetag)
@@ -350,15 +356,28 @@ def create_side_tag(downstream_target, upstream_sidetag):
 
     # Create downstream sidetag
     if not config.dry_run:
-        downstream_sidetag = downstream_koji.createSideTag(downstream_tag, suffix="stack-gate")["name"]
+        downstream_sidetag = downstream_koji.createSideTag(
+            downstream_tag, suffix="stack-gate"
+        )["name"]
     else:
-        logger.info("Running in dry_run mode, not creating downstream_sidetag for %s." % downstream_tag)
+        logger.info(
+            "Running in dry_run mode, not creating downstream_sidetag for %s."
+            % downstream_tag
+        )
         downstream_sidetag = "%s-dry-run-mode-stack-gate" % downstream_tag
 
     # Set the mapping between upstream sidetag and downstream sidetag.
     if not config.dry_run:
-        upstream_koji.editTag2(upstream_sidetag, extra={"downstream_sidetag": downstream_sidetag})
-        logger.info("Downstream sidetag for %s created: %s." % (upstream_sidetag, downstream_sidetag))
+        upstream_koji.editTag2(
+            upstream_sidetag, extra={"downstream_sidetag": downstream_sidetag}
+        )
+        logger.info(
+            "Downstream sidetag for %s created: %s."
+            % (upstream_sidetag, downstream_sidetag)
+        )
     else:
-        logger.info("Running in dry_run mode, not editing upstream_sidetag %s ." % upstream_sidetag)
+        logger.info(
+            "Running in dry_run mode, not editing upstream_sidetag %s ."
+            % upstream_sidetag
+        )
     return downstream_sidetag

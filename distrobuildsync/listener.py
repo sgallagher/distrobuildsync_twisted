@@ -9,9 +9,19 @@ from queue import Empty
 logger = config.logger
 
 
-RebuildData = namedtuple("RebuildData",
-                         ["ns", "comp", "version", "release", "scmurl", "downstream_target", "ref_overrides"],
-                         defaults=[None, None])
+RebuildData = namedtuple(
+    "RebuildData",
+    [
+        "ns",
+        "comp",
+        "version",
+        "release",
+        "scmurl",
+        "downstream_target",
+        "ref_overrides",
+    ],
+    defaults=[None, None],
+)
 
 
 def process_message(msg):
@@ -43,18 +53,23 @@ def process_message(msg):
     target_override = None
     ref_overrides = None
     tag = msg.body["tag"]
-    upstream_build_tag = config.main["trigger"]["rpms"].replace("-gate", "-build")
+    upstream_build_tag = config.main["trigger"]["rpms"].replace(
+        "-gate", "-build"
+    )
 
     # Check that we are watching for this tag
     if tag == config.main["trigger"]["rpms"]:
         ns = "rpms"
-    elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
-          or tag.startswith("%s-side" % upstream_build_tag)):
+    elif (
+        tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate")
+    ) or tag.startswith("%s-side" % upstream_build_tag):
         ns = "rpms"
     elif tag == config.main["trigger"]["modules"]:
         ns = "modules"
     else:
-        logger.debug(f"Message tag {tag} not configured as a trigger, ignoring.")
+        logger.debug(
+            f"Message tag {tag} not configured as a trigger, ignoring."
+        )
         return
 
     # Check whether this component is meaningful to us
@@ -73,14 +88,19 @@ def process_message(msg):
         bi = kojihelpers.get_build_info(nvr)
         ref_overrides = kojihelpers.get_ref_overrides(bi["modulemd"])
 
-    elif ((tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate"))
-       or tag.startswith("%s-side" % upstream_build_tag)):
+    elif (
+        tag.startswith(upstream_build_tag) and tag.endswith("-stack-gate")
+    ) or tag.startswith("%s-side" % upstream_build_tag):
         # Ensure that the downstream side-tag exists
-        target_override = kojihelpers.create_side_tag(config.main["build"]["target"], tag)
+        target_override = kojihelpers.create_side_tag(
+            config.main["build"]["target"], tag
+        )
 
     scmurl = kojihelpers.get_scmurl(msg.body["build_id"])
 
-    rd = RebuildData(ns, comp, version, release, scmurl, target_override, ref_overrides)
+    rd = RebuildData(
+        ns, comp, version, release, scmurl, target_override, ref_overrides
+    )
 
     reactor.callFromThread(config.batch_processor.reset)
     reactor.callFromThread(config.message_queue.put, rd)
@@ -108,7 +128,11 @@ def rebuild_batch(target, builds):
     bsys = kojihelpers.get_buildsys("destination")
 
     # skip tagging and waiting for the repo if source and destination build systems differ
-    if not config.dry_run and config.main["source"]["profile"] == config.main["destination"]["profile"]:
+    if (
+        not config.dry_run
+        and config.main["source"]["profile"]
+        == config.main["destination"]["profile"]
+    ):
         with bsys.multicall(batch=config.koji_batch) as mc:
             for build in builds:
                 nvr = f"{build.comp}-{build.version}-{build.release}"
@@ -143,8 +167,16 @@ def build_components(target, builds):
 
             dry = "DRY-RUN: " if config.dry_run else ""
             scratch = "Scratch-b" if config.main["build"]["scratch"] else "B"
-            logger.info(f"{dry}{scratch}uilding {downstream_scmurl} for {target}")
+            logger.info(
+                f"{dry}{scratch}uilding {downstream_scmurl} for {target}"
+            )
 
             if not config.dry_run:
-                kojihelpers.call_distrogitsync(namespace, component, rd.ref_overrides)
-                bsys.build(downstream_scmurl, target, {"scratch": config.main["build"]["scratch"]})
+                kojihelpers.call_distrogitsync(
+                    namespace, component, rd.ref_overrides
+                )
+                bsys.build(
+                    downstream_scmurl,
+                    target,
+                    {"scratch": config.main["build"]["scratch"]},
+                )
