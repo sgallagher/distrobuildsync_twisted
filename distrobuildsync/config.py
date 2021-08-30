@@ -410,9 +410,17 @@ def load_config():
         if "components" in y:
             cnf = y["components"]
         else:
-            cnf = get_distro_packages(
-                distro_view=n["control"]["autopackagelist"]
-            )
+            if "content_resolver" in n["control"]["autopackagelist"]:
+                cnf = get_distro_packages(
+                    distro_url=n["control"]["autopackagelist"][
+                        "content_resolver"
+                    ],
+                    distro_view=n["control"]["autopackagelist"]["view"],
+                )
+            else:
+                cnf = get_distro_packages(
+                    distro_view=n["control"]["autopackagelist"]["view"],
+                )
         for k in ("rpms", "modules"):
             if k in cnf:
                 for p in cnf[k].keys():
