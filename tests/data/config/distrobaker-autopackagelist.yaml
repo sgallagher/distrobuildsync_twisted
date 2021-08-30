@@ -1,0 +1,79 @@
+configuration:
+  source:
+    scm: https://src.fedoraproject.org
+    cache:
+      url: https://src.fedoraproject.org/repo/pkgs
+      cgi: https://src.fedoraproject.org/repo/pkgs/upload.cgi
+      path: "%(name)s/%(filename)s/%(hashtype)s/%(hash)s/%(filename)s"
+    profile: koji
+    mbs: https://mbs.fedoraproject.org
+  destination:
+    scm: https://src.fedoraproject.org
+    cache:
+      url: https://src.fedoraproject.org/repo/pkgs
+      cgi: https://src.fedoraproject.org/repo/pkgs/upload.cgi
+      path: "%(name)s/%(filename)s/%(hashtype)s/%(hash)s/%(filename)s"
+    profile: koji
+    mbs: https://mbs.fedoraproject.org
+  trigger:
+    rpms: f35
+    # This is a dummy value as modules are currently unsupported
+    modules: f35-modular
+  build:
+    prefix: git+https://src.fedoraproject.org
+    target: eln
+    scratch: false
+    platform: platform:f35
+  git:
+    author: DistroBaker
+    email: osci-list@redhat.com
+    message: |
+      Merged update from upstream sources
+
+      This is an automated DistroBaker update from upstream sources.
+      If you do not know what this is about or would like to opt out,
+      contact the OSCI team.
+  control:
+    build: true
+    merge: false
+    strict: true
+    autopackagelist:
+      content_resolver: https://cr.example.com
+      view: eln
+    exclude:
+      rpms:
+        # shim has its own building proceedure
+        - shim
+        - shim-signed
+        - shim-unsigned-aarch64
+        - shim-unsigned-x64
+        # it takes too much infra resources to try kernel builds automatically
+        - kernel
+        # In RHEL kernel-headers is a sub-package of kernel
+        - kernel-headers
+        # In RHEL kernel-tools is a sub-package of kernel
+        - kernel-tools
+        # In RHEL rubygems is a sub-package of ruby
+        - rubygems
+        # In RHEL rubygem-json is a sub-package of ruby
+        - rubygem-json
+        # In RHEL rubygem-minitest is a sub-package of ruby
+        - rubygem-minitest
+        # In RHEL rubygem-power_assert is a sub-package of ruby
+        - rubygem-power_assert
+        # In RHEL rubygem-rake is a sub-package of ruby
+        - rubygem-rake
+        # In RHEL rubygem-rdoc is a sub-package of ruby
+        - rubygem-rdoc
+        # In RHEL rubygem-test-unit is a sub-package of ruby
+        - rubygem-test-unit
+  defaults:
+    rpms:
+      source: "%(component)s.git#rawhide"
+      destination: "%(component)s.git#rawhide"
+    modules:
+      source: "%(component)s.git#%(stream)s"
+      destination: "%(component)s.git#%(stream)s-rhel-9.0.0-beta"
+    cache:
+      source: "%(component)s"
+      destination: "%(component)s"

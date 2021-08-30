@@ -6,6 +6,8 @@ import distrobuildsync
 from distrobuildsync import config
 from parameterized import parameterized
 import helpers
+import re
+import responses
 
 try:
     import unittest2 as unittest
@@ -22,9 +24,7 @@ class TestConfigSetting(unittest.TestCase):
             )
             # try loading the config
             config.scmurl = td + "#main"
-            cfg = config.load_config()
-
-        print("DEBUG loaded config =", cfg, file=sys.stderr)
+            config.load_config()
 
         # verify some derived values are present in the configuration
         # with the expected values
@@ -80,3 +80,46 @@ class TestConfigSetting(unittest.TestCase):
                     expected_error, cm.output
                 ),
             )
+
+    @responses.activate
+    def test_load_autopackagelist(self):
+        def request_callback(request):
+            return (200, {}, "PackageA\nPackageB")
+
+        responses.add_callback(
+            responses.GET,
+            re.compile("https://cr.example.com/.*"),
+            callback=request_callback,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            helpers.setup_test_repo(
+                td,
+                os.path.join(
+                    helpers.DATA_DIR,
+                    "config",
+                    "distrobaker-autopackagelist.yaml",
+                ),
+            )
+            config.scmurl = td + "#main"
+            config.load_config()
+
+        # verify some derived values are present in the configuration
+        # with the expected values
+        self.assertEqual(
+            config.comps["rpms"]["PackageA"],
+            {
+                "source": "PackageA.git#rawhide",
+                "destination": "PackageA.git#rawhide",
+                "cache": {"source": "PackageA", "destination": "PackageA"},
+            },
+        )
+
+        self.assertEqual(
+            config.comps["rpms"]["PackageB"],
+            {
+                "source": "PackageB.git#rawhide",
+                "destination": "PackageB.git#rawhide",
+                "cache": {"source": "PackageB", "destination": "PackageB"},
+            },
+        )
