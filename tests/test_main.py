@@ -40,9 +40,7 @@ class TestConfigRef(unittest.TestCase):
         self.logger.debug("git last commit = %s" % last_commit)
         self.assertRegex(last_commit.decode(), helpers.GIT_HASH_REGEX)
 
-        config_ref = yield config.get_config_ref(
-            self.git_repo_dir + "#main"
-        )
+        config_ref = yield config.get_config_ref(self.git_repo_dir + "#main")
 
         self.logger.debug("config ref = %s" % config_ref)
         self.assertRegex(config_ref.decode(), helpers.GIT_HASH_REGEX)

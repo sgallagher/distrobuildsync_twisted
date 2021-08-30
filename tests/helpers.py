@@ -57,11 +57,7 @@ def setup_test_repo(git_repo_dir, cfg_file=None):
             ["bash", "-c", "echo test > README"],
         ]
         if cfg_file:
-            cmds.extend(
-                [
-                    ["cp", cfg_file, "distrobaker.yaml"],
-                ]
-            )
+            cmds.extend([["cp", cfg_file, "distrobaker.yaml"]])
         cmds.extend(
             [
                 ["git", "add", "."],

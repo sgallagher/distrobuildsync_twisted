@@ -12,9 +12,13 @@ except ImportError:
 class TestMiscSettings(unittest.TestCase):
     def test_loglevel(self):
         self.assertIsNotNone(distrobuildsync.config.loglevel())
-        self.assertEqual(distrobuildsync.config.loglevel(logging.INFO), logging.INFO)
+        self.assertEqual(
+            distrobuildsync.config.loglevel(logging.INFO), logging.INFO
+        )
         self.assertEqual(distrobuildsync.config.loglevel(), logging.INFO)
-        self.assertEqual(distrobuildsync.config.loglevel(logging.DEBUG), logging.DEBUG)
+        self.assertEqual(
+            distrobuildsync.config.loglevel(logging.DEBUG), logging.DEBUG
+        )
         self.assertEqual(distrobuildsync.config.loglevel(), logging.DEBUG)
 
     def test_retries(self):
@@ -69,10 +73,12 @@ class TestMiscParsing(unittest.TestCase):
 
     def test_split_module(self):
         self.assertDictEqual(
-            distrobuildsync.config.split_module(""), {"name": "", "stream": "master"}
+            distrobuildsync.config.split_module(""),
+            {"name": "", "stream": "master"},
         )
         self.assertDictEqual(
-            distrobuildsync.config.split_module(":"), {"name": "", "stream": "master"}
+            distrobuildsync.config.split_module(":"),
+            {"name": "", "stream": "master"},
         )
         self.assertDictEqual(
             distrobuildsync.config.split_module("name"),

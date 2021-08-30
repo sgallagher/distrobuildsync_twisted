@@ -55,11 +55,7 @@ class TestConfigSetting(unittest.TestCase):
                 "distrobaker-no-configuration.yaml",
                 "configuration block is missing",
             ),
-            (
-                "no trigger",
-                "distrobaker-no-trigger.yaml",
-                "trigger missing",
-            ),
+            ("no trigger", "distrobaker-no-trigger.yaml", "trigger missing"),
             (
                 "no source profile",
                 "distrobaker-no-source-profile.yaml",
@@ -72,8 +68,7 @@ class TestConfigSetting(unittest.TestCase):
     ):
         with tempfile.TemporaryDirectory() as td:
             helpers.setup_test_repo(
-                td,
-                os.path.join(helpers.DATA_DIR, "config", config_file),
+                td, os.path.join(helpers.DATA_DIR, "config", config_file)
             )
             with self.assertLogs(config.logger) as cm:
                 config.scmurl = td + "#main"
