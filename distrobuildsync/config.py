@@ -419,7 +419,7 @@ def load_config():
                 )
             else:
                 cnf = get_distro_packages(
-                    distro_view=n["control"]["autopackagelist"]["view"],
+                    distro_view=n["control"]["autopackagelist"]["view"]
                 )
         for k in ("rpms", "modules"):
             if k in cnf:
