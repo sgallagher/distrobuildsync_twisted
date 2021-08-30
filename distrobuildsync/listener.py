@@ -163,7 +163,6 @@ def build_components(target, builds):
 
     with bsys.multicall(batch=config.koji_batch) as mc:
         for rd in builds:
-            logger.critical(f"REMOVEME: {rd}")
             component = rd.comp
             namespace = rd.ns
             ref = config.split_scmurl(rd.scmurl)["ref"]
