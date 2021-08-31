@@ -1,0 +1,38 @@
+#!/bin/bash
+set -eo pipefail
+
+echo "Running scheduler"
+(while true; do kinit -k -t /keytab/ssh-privatekey distrobaker/distrobaker.osci.redhat.com@REDHAT.COM; sleep 1h; done) &
+
+# This method should be executed manually each time user login to the pod
+generate_container_user() {
+  local passwd_output_dir="/tmp"
+  export USER_ID=$(id -u)
+  export GROUP_ID=$(id -g)
+  envsubst < /passwd.template > ${passwd_output_dir}/passwd
+  export LD_PRELOAD=libnss_wrapper.so
+  export NSS_WRAPPER_PASSWD=${passwd_output_dir}/passwd
+  export NSS_WRAPPER_GROUP=/etc/group
+}
+
+mkdir .ssh
+
+# Enabling dist git automation
+cat <<EOF >> .ssh/config
+Host pkgs.devel.redhat.com
+  User distrobaker
+  GSSAPIAuthentication yes
+  PreferredAuthentications gssapi-with-mic
+  Compression yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+EOF
+
+chmod 600 .ssh/config
+
+ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
+
+generate_container_user
+
+# Commnet for Fedora
+exec /usr/libexec/s2i/run

@@ -1,0 +1,17 @@
+#!/bin/bash
+set -eo pipefail
+
+# Fix for the "invalid syntax: sys.stderr.write(f"ERROR: {exc}")"
+curl -s -O --insecure https://bootstrap.pypa.io/pip/2.7/get-pip.py
+python get-pip.py
+
+pip install --upgrade pip
+pip install 'setuptools>40.0.0,<45.0.0'
+pip install requests
+
+ln -sf /etc/pki/tls/certs/ca-bundle.crt $(python3 -c 'import requests; print(requests.certs.where())')
+echo "Checking certificates"
+python3 -c 'import requests; print(requests.get("https://engineering.redhat.com/"))'
+
+# Comment for Fedora
+exec /usr/libexec/s2i/assemble
