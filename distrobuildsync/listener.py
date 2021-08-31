@@ -98,6 +98,9 @@ def process_message(msg):
             config.main["build"]["target"], tag
         )
 
+    if not target_override:
+        target_override = config.main["build"]["target"]
+
     scmurl = kojihelpers.get_scmurl(msg.body["build_id"])
 
     rd = RebuildData(
